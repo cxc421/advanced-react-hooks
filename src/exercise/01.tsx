@@ -4,29 +4,27 @@
 import React from 'react';
 
 type CountState = {count: number};
-type CountAction =
-  | Partial<CountState>
-  | ((curState: CountState) => Partial<CountState>);
+type CountAction = {type: 'INCREMENT'; step: number};
 
-const countReducer = (state: CountState, action: CountAction) => ({
-  ...state,
-  ...(typeof action === 'function' ? action(state) : action),
-});
+const countReducer = (state: CountState, action: CountAction): CountState => {
+  if (action.type === 'INCREMENT') {
+    return {
+      ...state,
+      count: state.count + action.step,
+    };
+  }
+  return state;
+};
 
 function Counter({initialCount = 0, step = 1}) {
-  const [state, setState] = React.useReducer(countReducer, {
-    count: initialCount,
-  });
-  const {count} = state;
-  const incrementByFunction = () =>
-    setState(currentState => ({count: currentState.count + step}));
-  const incrementByObject = () => setState({count: count + step});
-  return (
-    <>
-      <button onClick={incrementByFunction}>{count}</button>
-      <button onClick={incrementByObject}>{count}</button>
-    </>
+  const [state, dispatch] = React.useReducer(
+    countReducer,
+    initialCount,
+    initialCount => ({count: initialCount}),
   );
+  const {count} = state;
+  const increment = () => dispatch({type: 'INCREMENT', step});
+  return <button onClick={increment}>{count}</button>;
 }
 
 function App() {
