@@ -1,6 +1,7 @@
 // useCallback: custom hooks
 // http://localhost:3000/isolated/exercise/02.js
 import React, {FC} from 'react';
+import {Pokemon} from '../pokemon';
 import {
   fetchPokemon,
   PokemonForm,
@@ -9,30 +10,46 @@ import {
   PokemonErrorBoundary,
 } from '../pokemon';
 
+function useSafeDispatch<T>(dispatch: React.Dispatch<T>): React.Dispatch<T> {
+  const componentMountedRef = React.useRef(false);
+
+  React.useLayoutEffect(() => {
+    componentMountedRef.current = true;
+    return () => {
+      componentMountedRef.current = false;
+    };
+  }, []);
+
+  return React.useCallback(
+    action => {
+      if (componentMountedRef.current) {
+        dispatch(action);
+      }
+    },
+    [dispatch],
+  );
+}
 
 type AsyncState =
-  | {status: 'idle';}
-  | {status: 'pending'; }
-  | {status: 'resolved'; data: any; }
+  | {status: 'idle'}
+  | {status: 'pending'}
+  | {status: 'resolved'; data: unknown}
   | {status: 'rejected'; error: Error};
 
 type AsyncAction =
   | {type: 'pending'}
-  | {type: 'resolved'; data: any}
+  | {type: 'resolved'; data: unknown}
   | {type: 'rejected'; error: Error};
 
-function useAsyncReducer(
-  state: AsyncState,
-  action: AsyncAction,
-): AsyncState {
+function useAsyncReducer(state: AsyncState, action: AsyncAction): AsyncState {
   switch (action.type) {
-    case 'pending': {      
+    case 'pending': {
       return {status: 'pending'};
     }
-    case 'resolved': {      
+    case 'resolved': {
       return {status: 'resolved', data: action.data};
     }
-    case 'rejected': {      
+    case 'rejected': {
       return {status: 'rejected', error: action.error};
     }
     default: {
@@ -41,22 +58,25 @@ function useAsyncReducer(
   }
 }
 
-function useAsync(asyncCallback: () => Promise<any> | undefined, initialState: AsyncState, deps: any[]) {
-  const [state, dispatch] = React.useReducer(useAsyncReducer, initialState);
+function useAsync(initialState: AsyncState) {
+  const [state, unsafeDispatch] = React.useReducer(
+    useAsyncReducer,
+    initialState,
+  );
+  const dispatch = useSafeDispatch(unsafeDispatch);
 
-  React.useEffect(() => {
-    const promise = asyncCallback()
-    if (!promise) {
-      return
-    }
-    dispatch({type: 'pending'});
-    promise
-      .then(data => dispatch({ type: 'resolved', data }), error => dispatch({type: 'rejected', error}));
+  const run = React.useCallback(
+    (promise: Promise<unknown>) => {
+      dispatch({type: 'pending'});
+      promise.then(
+        data => dispatch({type: 'resolved', data}),
+        error => dispatch({type: 'rejected', error}),
+      );
+    },
+    [dispatch],
+  );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  
-  return state;
+  return {...state, run};
 }
 
 type PokemonInfoProps = {
@@ -64,16 +84,15 @@ type PokemonInfoProps = {
 };
 
 const PokemonInfo: FC<PokemonInfoProps> = ({pokemonName}) => {
-  const state = useAsync(
-    () => {
-      if (!pokemonName) {
-        return
-      }
-      return fetchPokemon(pokemonName)
-    },
-    {status: pokemonName ? 'pending' : 'idle'},
-    [pokemonName],
-  )
+  const state = useAsync({
+    status: pokemonName ? 'pending' : 'idle',
+  });
+  const {run} = state;
+
+  React.useEffect(() => {
+    if (!pokemonName) return;
+    run(fetchPokemon(pokemonName));
+  }, [pokemonName, run]);
 
   if (state.status === 'idle' || !pokemonName) {
     return <>Submit a pokemon</>;
@@ -82,7 +101,7 @@ const PokemonInfo: FC<PokemonInfoProps> = ({pokemonName}) => {
   } else if (state.status === 'rejected') {
     throw state.error;
   } else if (state.status === 'resolved') {
-    return <PokemonDataView pokemon={state.data} />;
+    return <PokemonDataView pokemon={state.data as Pokemon} />;
   }
 
   throw new Error('This should be impossible');
