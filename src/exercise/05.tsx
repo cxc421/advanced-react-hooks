@@ -1,25 +1,50 @@
 // useImperativeHandle: scroll to top/bottom
 // http://localhost:3000/isolated/exercise/05.js
 
-import React from 'react'
+import React from 'react';
 
-// 🐨 wrap this in a React.forwardRef and accept `ref` as the second argument
-function MessagesDisplay({messages}) {
-  const containerRef = React.useRef()
+type Message = {
+  id: number;
+  author: string;
+  content: string;
+};
+
+type MessageDisplayProps = {
+  messages: Message[];
+};
+
+type MessageDisplayRef = {
+  scrollToTop: () => void;
+  scrollToBottom: () => void;
+};
+
+const MessagesDisplay = React.forwardRef<
+  MessageDisplayRef,
+  MessageDisplayProps
+>(({messages}, messageRef) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
   React.useLayoutEffect(() => {
-    scrollToBottom()
-  })
+    scrollToBottom();
+  });
 
   // 💰 you're gonna want this as part of your imperative methods
-  // function scrollToTop() {
-  //   containerRef.current.scrollTop = 0
-  // }
+  function scrollToTop() {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  }
   function scrollToBottom() {
-    containerRef.current.scrollTop = containerRef.current.scrollHeight
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
   }
 
   // 🐨 call useImperativeHandle here with your ref and a callback function
   // that returns an object with scrollToTop and scrollToBottom
+  React.useImperativeHandle(messageRef, () => ({
+    scrollToTop,
+    scrollToBottom,
+  }));
 
   return (
     <div ref={containerRef} role="log">
@@ -30,23 +55,23 @@ function MessagesDisplay({messages}) {
         </div>
       ))}
     </div>
-  )
-}
+  );
+});
 
 function App() {
-  const messageDisplayRef = React.useRef()
-  const [messages, setMessages] = React.useState(allMessages.slice(0, 8))
+  const messageDisplayRef = React.useRef<MessageDisplayRef>(null);
+  const [messages, setMessages] = React.useState(allMessages.slice(0, 8));
   const addMessage = () =>
     messages.length < allMessages.length
       ? setMessages(allMessages.slice(0, messages.length + 1))
-      : null
+      : null;
   const removeMessage = () =>
     messages.length > 0
       ? setMessages(allMessages.slice(0, messages.length - 1))
-      : null
+      : null;
 
-  const scrollToTop = () => messageDisplayRef.current.scrollToTop()
-  const scrollToBottom = () => messageDisplayRef.current.scrollToBottom()
+  const scrollToTop = () => messageDisplayRef.current!.scrollToTop();
+  const scrollToBottom = () => messageDisplayRef.current!.scrollToBottom();
 
   return (
     <div className="messaging-app">
@@ -63,10 +88,10 @@ function App() {
         <button onClick={scrollToBottom}>scroll to bottom</button>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
 
 const allMessages = [
   `Leia: Aren't you a little short to be a stormtrooper?`,
@@ -100,4 +125,4 @@ const allMessages = [
   `Leia: Don't just stand there. Try to brace it with something.`,
   `Luke: Wait a minute!`,
   `Luke: Threepio! Come in Threepio! Threepio! Where could he be?`,
-].map((m, i) => ({id: i, author: m.split(': ')[0], content: m.split(': ')[1]}))
+].map((m, i) => ({id: i, author: m.split(': ')[0], content: m.split(': ')[1]}));
